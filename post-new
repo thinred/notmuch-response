@@ -2,10 +2,18 @@
 
 set -eu
 
-MYNAME="YOUR NAME"
-
 here=$(dirname "$0")
 cd "${here}"
+
+if [ -f config ]; then
+    source config
+fi
+
+FIRST=${NM_FIRSTNAME:-YOURFIRSTNAME}
+LAST=${NM_LASTNAME:-YOURLASTNAME}
+
+FROM_FILTER="from:${FIRST} from:${LAST}"
+TO_FILTER="to:${FIRST} to:${LAST}"
 
 # do some basic tagging here
 
@@ -13,12 +21,13 @@ cd "${here}"
 ./notmuch-response index
 
 # tag my e-mails with no response
-notmuch tag +noack -- tag:noresponse from:"${MYNAME}"
-notmuch tag -noack -- tag:response from:"${MYNAME}"
+notmuch tag +noack -- tag:noresponse ${FROM_FILTER}
 
 # tag e-mails to me with no response
-notmuch tag +backlog -- tag:noresponse to:"${MYNAME}"
-notmuch tag -backlog -- tag:response to:"${MYNAME}"
+notmuch tag +backlog -- tag:noresponse ${TO_FILTER}
+
+# untag everything that has response
+notmuch tag -noack -backlog -- tag:response
 
 # clear new tag
 notmuch tag -new -- tag:new

@@ -1,0 +1,24 @@
+#!/bin/bash
+
+set -eu
+
+MYNAME="YOUR NAME"
+
+here=$(dirname "$0")
+cd "${here}"
+
+# do some basic tagging here
+
+# untag replied e-mails
+./notmuch-response index
+
+# tag my e-mails with no response
+notmuch tag +noack -- tag:noresponse from:"${MYNAME}"
+notmuch tag -noack -- tag:response from:"${MYNAME}"
+
+# tag e-mails to me with no response
+notmuch tag +backlog -- tag:noresponse to:"${MYNAME}"
+notmuch tag -backlog -- tag:response to:"${MYNAME}"
+
+# clear new tag
+notmuch tag -new -- tag:new

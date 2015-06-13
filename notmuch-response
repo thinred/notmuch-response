@@ -1,0 +1,91 @@
+#!/usr/bin/env python3
+
+from subprocess import check_output, check_call
+from tempfile import NamedTemporaryFile
+import sys
+import json
+
+# basic functions
+
+def cmd_run(cmd):
+    print('Running: {}'.format(cmd))
+    return check_call(cmd)
+
+def cmd_capture(cmd):
+    print('Running: {}'.format(cmd))
+    return check_output(cmd)
+
+# reconstruct responses from thread info
+
+def traverse(msg, ms, parent = None):
+    assert len(msg) == 2
+    head = msg[0]
+    head_id = head['id']
+    if parent is not None:
+        ms.append((head_id, parent))
+    children = msg[1]
+    for ch in children:
+        traverse(ch, ms, parent = head_id)
+
+def get_responses(obj):
+    ms = []
+    for thread in obj:  # over all threads
+        for top_message in thread:  # top-level messages
+            traverse(top_message, ms, None)
+    return ms
+
+def get_replied_ids(query):
+    notmuch = [ 'notmuch', 'show', '--format=json',
+                '--entire-thread=true', '--body=false', query ]
+    out = cmd_capture(notmuch)
+    out = out.decode('utf-8', 'replace')  # cope with occasional non-utf8 chars
+    threads = json.loads(out)
+    ms = get_responses(threads)
+    replied = set( x[1] for x in ms )
+    return sorted(replied)
+
+# stuff to untag messages
+
+def untag_ids(ids):
+    batch = []
+    batch = '\n'.join('-noresponse +response -- id:{}'.format(i) for i in ids)
+    with NamedTemporaryFile() as batch_file:
+        batch_file.write(batch.encode('utf-8'))
+        batch_file.flush()
+        notmuch = [ 'notmuch', 'tag',
+                    '--batch', '--input={}'.format(batch_file.name) ]
+        cmd_run(notmuch)
+
+# high-level commands
+
+def index():
+    # indexes only the new mails
+    replied = get_replied_ids('tag:new')
+    if len(replied) == 0:
+        print('Nothing to untag.')
+    else:
+        print('IDs to untag ({}): {}'.format(len(replied), ', '.join(replied)))
+        untag_ids(replied)
+
+def reindex():
+    # reindexes EVERYTHING, it may take some time
+    # 1. tag everything with unreplied
+    cmd_run([ 'notmuch', 'tag', '+noresponse', '-response', '*' ])
+    # 3. get all reply ids
+    replied = get_replied_ids('*')
+    print('Replies to untag: {}'.format(len(replied)))
+    # 4. untag these ids
+    untag_ids(replied)
+
+if __name__ == '__main__':
+    if len(sys.argv) != 2:
+        print('Usage: {} <index|reindex>'.format(sys.argv[0]))
+        sys.exit(1)
+    cmd = sys.argv[1]
+    if cmd == 'index':
+        index()
+    elif cmd == 'reindex':
+        reindex()
+    else:
+        print('Unknown command: {}'.format(cmd))
+        sys.exit(1)

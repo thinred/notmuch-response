@@ -28,6 +28,11 @@ the implementation recreates it from thread structure;
 it's actually quite pretty, but it would be *much* simpler
 to just get the header
 
+## Caveats
+
+* It seems that `notmuch-response index` makes mutt maildirs with
+new mails lose their `unread` mark
+
 ## Internals
 
 The way it works is rather simple: we look at each message in the

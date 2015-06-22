@@ -27,8 +27,10 @@ some humongous mailbox (but I doubt anybody has such a mailbox)
 the implementation recreates it from thread structure;
 it's actually quite pretty, but it would be *much* simpler
 to just get the header
-* It seems that `notmuch-response index` makes mutt maildirs with
-new mails lose their `unread` mark
+* if used with offlineimap, `notmuch-response index` makes mutt
+folders read immediately; it is due to a subtle interplay between
+offlineimap and notmuch, see [Debian Bug #789625](http://bugs.debian.org/789625)
+(contains a quick fix)
 
 ## Internals
 

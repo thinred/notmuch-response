@@ -58,34 +58,37 @@ def untag_ids(ids):
 
 # high-level commands
 
-def index():
+def index(query = None):
     # indexes only the new mails
-    replied = get_replied_ids('tag:new')
+    query = 'tag:new' if query is None else query
+    replied = get_replied_ids(query)
     if len(replied) == 0:
         print('Nothing to untag.')
     else:
         print('IDs to untag ({}): {}'.format(len(replied), ', '.join(replied)))
         untag_ids(replied)
 
-def reindex():
-    # reindexes EVERYTHING, it may take some time
+def reindex(query = None):
+    # reindexes messages that much the query, it may take some time
     # 1. tag everything with unreplied
-    cmd_run([ 'notmuch', 'tag', '+noresponse', '-response', '*' ])
+    query = '*' if query is None else query
+    cmd_run([ 'notmuch', 'tag', '+noresponse', '-response', query ])
     # 3. get all reply ids
-    replied = get_replied_ids('*')
+    replied = get_replied_ids(query)
     print('Replies to untag: {}'.format(len(replied)))
     # 4. untag these ids
     untag_ids(replied)
 
 if __name__ == '__main__':
-    if len(sys.argv) != 2:
-        print('Usage: {} <index|reindex>'.format(sys.argv[0]))
+    if len(sys.argv) not in [ 2, 3 ]:
+        print('Usage: {} <index|reindex> [query]'.format(sys.argv[0]))
         sys.exit(1)
     cmd = sys.argv[1]
+    query = None if len(sys.argv) == 2 else sys.argv[2]
     if cmd == 'index':
-        index()
+        index(query)
     elif cmd == 'reindex':
-        reindex()
+        reindex(query)
     else:
         print('Unknown command: {}'.format(cmd))
         sys.exit(1)

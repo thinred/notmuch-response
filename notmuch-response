@@ -1,19 +1,26 @@
 #!/usr/bin/env python3
 
-from subprocess import check_output, check_call
+from subprocess import check_output, check_call, Popen, PIPE
 from tempfile import NamedTemporaryFile
 import sys
-import json
+# import json
+import ijson
+import codecs
 
 # basic functions
 
 def cmd_run(cmd):
-    print('Running: {}'.format(cmd))
+    print('Running (run): {}'.format(cmd))
     return check_call(cmd)
 
 def cmd_capture(cmd):
-    print('Running: {}'.format(cmd))
+    print('Running (capture): {}'.format(cmd))
     return check_output(cmd)
+
+def cmd_stream(cmd):
+    print('Running (stream): {}'.format(cmd))
+    p = Popen(cmd, stdout = PIPE)
+    return p
 
 # reconstruct responses from thread info
 
@@ -30,27 +37,36 @@ def traverse(msg, ms, parent = None):
 def get_responses(obj):
     ms = []
     for thread in obj:  # over all threads
-        for top_message in thread:  # top-level messages
-            traverse(top_message, ms, None)
+        get_responses_from_thread(thread, ms)
     return ms
+
+def get_responses_from_thread(thread, ms):
+    for top_message in thread:
+        traverse(top_message, ms, None)
 
 def get_replied_ids(query):
     notmuch = [ 'notmuch', 'show', '--format=json',
                 '--entire-thread=true', '--body=false', query ]
-    out = cmd_capture(notmuch)
-    out = out.decode('utf-8', 'replace')  # cope with occasional non-utf8 chars
-    threads = json.loads(out)
-    ms = get_responses(threads)
+    out = cmd_stream(notmuch)
+    ms = []
+    try:
+        reader = codecs.getreader('utf8')
+        reader = reader(out.stdout, errors = 'replace')
+        threads = ijson.items(reader, 'item')
+        for thread in threads:
+            get_responses_from_thread(thread, ms)
+    finally:
+        pass
     replied = set( x[1] for x in ms )
     return sorted(replied)
 
 # stuff to untag messages
 
 def untag_ids(ids):
-    batch = []
-    batch = '\n'.join('-noresponse +response -- id:{}'.format(i) for i in ids)
     with NamedTemporaryFile() as batch_file:
-        batch_file.write(batch.encode('utf-8'))
+        for i in ids:
+            line = '-noresponse +response -- id:{}\n'.format(i)
+            batch_file.write(line.encode('utf8'))
         batch_file.flush()
         notmuch = [ 'notmuch', 'tag',
                     '--batch', '--input={}'.format(batch_file.name) ]

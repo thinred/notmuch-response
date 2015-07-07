@@ -3,9 +3,17 @@
 from subprocess import check_output, check_call, Popen, PIPE
 from tempfile import NamedTemporaryFile
 import sys
-# import json
-import ijson
+import json
 import codecs
+import sys
+
+try:
+    import ijson
+    HAS_IJSON = True
+except ImportError:
+    HAS_IJSON = False
+    print("WARN: ijson not available. I may choke on big mailbox.",
+          file=sys.stderr)
 
 # basic functions
 
@@ -52,9 +60,13 @@ def get_replied_ids(query):
     try:
         reader = codecs.getreader('utf8')
         reader = reader(out.stdout, errors = 'replace')
-        threads = ijson.items(reader, 'item')
-        for thread in threads:
-            get_responses_from_thread(thread, ms)
+        if HAS_IJSON:
+            threads = ijson.items(reader, 'item')
+            for thread in threads:
+                get_responses_from_thread(thread, ms)
+        else:
+            obj = json.load(reader)
+            ms = get_responses(obj)
     finally:
         pass
     replied = set( x[1] for x in ms )
